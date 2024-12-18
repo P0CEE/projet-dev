@@ -13,28 +13,153 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Post {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  title     String   @db.VarChar(255)
-  content   String?
-  published Boolean  @default(false)
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  Int
+// Enumérations pour meilleure type-safety et maintainabilité
+enum UserRole {
+  STUDENT
+  ADMIN
+  RP
 }
 
-model Profile {
-  id     Int     @id @default(autoincrement())
-  bio    String?
-  user   User    @relation(fields: [userId], references: [id])
-  userId Int     @unique
+enum PostStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  REJECTED
+}
+
+enum LoanStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
 }
 
 model User {
-  id      Int      @id @default(autoincrement())
-  email   String   @unique
-  name    String?
-  posts   Post[]
-  profile Profile?
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  imageUrl  String?
+  role      UserRole @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts         Post[]         @relation("author")
+  validatedPosts Post[]        @relation("validator")
+  loanRequests  LoanRequest[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Post {
+  id          String     @id @default(uuid())
+  title       String
+  content     String     @db.Text
+  mediaUrls   String[]   
+  status      PostStatus @default(DRAFT)
+  categories  Category[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  authorId    String
+  author      User       @relation("author", fields: [authorId], references: [id], onDelete: Cascade)
+  validatorId String?
+  validator   User?      @relation("validator", fields: [validatorId], references: [id])
+
+  comments    Comment[]
+
+  @@index([authorId])
+  @@index([validatorId])
+  @@map("posts")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  
+  posts       Post[]
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  quantity    Int      @default(0)
+  minQuantity Int      @default(1)     
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categories   Category[]
+  loanRequests LoanRequest[]
+  history      InventoryHistory[]
+
+  @@map("products")
+}
+
+model LoanRequest {
+  id        String     @id @default(uuid())
+  quantity  Int
+  status    LoanStatus @default(PENDING)
+  startDate DateTime
+  endDate   DateTime
+  notes     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([productId])
+  @@map("loan_requests")
+}
+
+model InventoryHistory {
+  id        String   @id @default(uuid())
+  quantity  Int
+  type      String  
+  reason    String
+  createdAt DateTime @default(now())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("inventory_history")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("comments")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  type      String  
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notifications")
 }
