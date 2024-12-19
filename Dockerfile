@@ -3,6 +3,21 @@ FROM node:20-alpine AS base
 RUN apk add --no-cache libc6-compat python3 make g++ openssl dos2unix && \
     corepack enable && corepack prepare pnpm@latest --activate
 
+FROM base AS prisma-studio
+WORKDIR /app
+ENV NODE_ENV=development
+ENV PATH /app/node_modules/.bin:$PATH
+
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma/
+
+RUN pnpm install --frozen-lockfile
+RUN npx prisma generate
+
+EXPOSE 5555
+
+CMD ["npx", "prisma", "studio"]
+
 FROM base AS dev
 WORKDIR /app
 ENV NODE_ENV=development
